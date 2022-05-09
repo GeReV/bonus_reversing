@@ -1,0 +1,7 @@
+.octet {
+    margin-right: .5em;
+}
+
+.octetHighlight {
+    color: var(--magenta);
+}

@@ -1,0 +1,16 @@
+.hexRow {}
+
+.hexRowHighlight {
+    background: var(--base02);
+}
+
+.hexRowAddress {
+    color: var(--hex-address);
+    margin-right: .5em;
+}
+
+.hexRowOctets {}
+
+.hexRowAscii {
+    color: var(--hex-ascii);
+}

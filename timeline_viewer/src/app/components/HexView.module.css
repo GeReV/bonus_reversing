@@ -1,0 +1,26 @@
+.hexview {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+}
+
+.header {
+    color: var(--hex-address);
+}
+
+.headerAddress {
+    margin-right: .5em;
+    opacity: 0;
+}
+
+.hexContainer {
+    overflow: auto;
+}
+
+.hexScrollPlaceholder {
+
+}
+
+.hexRows {
+    position: fixed;
+}

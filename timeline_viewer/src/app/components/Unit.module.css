@@ -1,0 +1,5 @@
+.unit {}
+
+.unitHighlight {
+    color: var(--magenta);
+}
