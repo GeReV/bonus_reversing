@@ -8,6 +8,8 @@ The core engine manages to encode a dictionary of nouns and verbs, including con
 
 I've been running these reversing efforts since 2019 or 2020, but included are only the most recent attempts.
 
+**NOTE:** As the game is still being actively sold, this repo will not include any executable files, memory dumps or runtime logs.
+
 ![](.github/screenshot.png)
 
 ## Packages
