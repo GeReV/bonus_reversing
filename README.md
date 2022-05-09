@@ -33,7 +33,7 @@ techniques used by programmers on DOS in the early 1990s.
 
 Later attempts including trying to use the [DosBox built-in debugger](https://www.vogons.org/viewtopic.php?t=3944) to both debug
 and dump the game's memory at different times and states. 
-Using the DosBox debugger made it difficult to follow the amounts of data and memory changes made by the game, as well as viewing the Hebrew OEM 862 encoding.
+Using the DosBox debugger made it difficult to follow the amounts of data and memory changes made by the game, as well as viewing the [Hebrew OEM 862 encoding](https://en.wikipedia.org/wiki/Code_page_862).
 
 Using that last method required sitting down with pen and paper, painstakingly following instructions without seeing the big picture, 
 testing my patience and attention span.
