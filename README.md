@@ -2,7 +2,7 @@
 
 This repository is dedicated to my research into reverse-engineering the Israeli 1993 DOS game [Bonus](https://www.mobygames.com/game/dos/bonus).
 
-The current objective of this research is to reverse and understand the core word engine used by the game. 
+The current objective of this research is to reverse and understand the core word engine used by the game, in an effort to preserve, replicate and enhance its dictionary. 
 
 The core engine manages to encode a dictionary of nouns and verbs, including conjugations with respect to gender, plurality and tense.
 
@@ -11,6 +11,10 @@ I've been running these reversing efforts since 2019 or 2020, but included are o
 **NOTE:** As the game is still being actively sold, this repo will not include any executable files, memory dumps or runtime logs.
 
 ![](.github/screenshot.png)
+
+## Knowledge Base
+
+The information I've gathered so far from the reversing efforts, will be documented in a separate file: [knowledgebase.md](knowledgebase.md).
 
 ## Packages
 
