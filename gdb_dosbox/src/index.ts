@@ -1,11 +1,13 @@
-import assert from "assert";
-import readline from "readline";
-import { createWriteStream } from "fs";
+import { strict as assert } from "assert";
+import * as readline from "readline";
+import { Buffer } from "buffer";
 import { writeFile } from "fs/promises";
 import { performance, PerformanceObserver } from 'perf_hooks';
 
 import { dumpUint8, GDBClient } from "./gdbclient";
 import { printRegisters, REGISTERS_386 } from "./gdb-utils";
+
+const DEFAULT_STEP_COUNT = 300000;
 
 const perfObserver = new PerformanceObserver((items) => {
     items.getEntries().forEach((entry) => {
@@ -32,7 +34,7 @@ interface BufferDiff {
     value: number;
 }
 
-function diffBuffers(a: Uint8Array, b: Uint8Array) {
+function diffBuffers(a: Uint32Array, b: Uint32Array) {
     assert(a.length === b.length, `a.length == ${a.length}, b.length == ${b.length}`);
 
     const diffs: BufferDiff[] = [];
@@ -41,11 +43,8 @@ function diffBuffers(a: Uint8Array, b: Uint8Array) {
         if (a[i] !== b[i]) {
             diffs.push({
                 address: i,
-                value: b[i] << 24 | b[i + 1] << 16 | b[i + 2] << 8 | b[i + 3]
+                value: b[i]
             });
-
-            // Skip another 3 bytes because we're reading 32-bits for value.
-            i += 3;
         }
     }
 
@@ -84,113 +83,133 @@ const rl = readline.createInterface({
     output: process.stdout
 });
 
-async function run(gdb: GDBClient, steps: number) {
-    let snapshot: Uint8Array | undefined;
-
-    const metadata: Metadata = {
-        memoryStart: 0,
-        memoryEnd: BASE_BUFFER_SIZE,
-        steps: [],
-    };
-
-    console.log("Waiting for INT 21 3D")
-    
-    await gdb.monitor("int_bp 0x21 1");
-    await sleep(200);
-    
-    await gdb.continue();
-
-    while (true) {
-        const trapMessage = await gdb.readResponse();
-
-        if (trapMessage !== "S05") {
-            continue;
-        }
-
-        const registers = await gdb.readRegisters();
-
-        if (((registers[0] >> 8) & 0xff) === 0x3d) {
-            break;
-        }
+async function cleanup(gdb: GDBClient) {
+    if (gdb.isConnected) {
+        console.log('Disconnecting...');
+        
+        await gdb.monitor("remote_debug 0");
+        await sleep(200);
+        
+        await gdb.monitor("int_bp 0x21 0");
+        await sleep(200);
 
         await gdb.continue();
-    }
-
-    const now = Date.now();
-
-    const binFile = createWriteStream(`buffer-${now}.bin`, "binary");
-
-    binFile.write(FOURCC_CODE);
-    binFile.write(new Uint8Array(new Uint32Array([VERSION_CODE, BASE_BUFFER_SIZE])));
-
-    binFile.write(await readMemory(gdb, BASE_BUFFER_SIZE));
-
-    for (let step = 0; step < steps; step++) {
-        // performance.mark("dump");
-
-        console.log(step);
-
-        const instruction = ""; // await gdb.monitor("x/i $pc");
-
-        const registersOffset = BASE_BUFFER_SIZE + step * (REGISTERS_SIZE + DIFF_SIZE);
-        const diffOffset = BASE_BUFFER_SIZE + step * (REGISTERS_SIZE + DIFF_SIZE) + REGISTERS_SIZE;
-
-        const stepMetadata: Metadata["steps"][number] = {
-            instruction,
-            registersStart: registersOffset,
-            registersEnd: registersOffset + REGISTERS_SIZE,
-            diffStart: diffOffset,
-            diffEnd: diffOffset + DIFF_SIZE,
-        };
-
-        metadata.steps.push(stepMetadata);
-
-        const registers = await gdb.readRegisters();
-
-        binFile.write(new Uint8Array(registers.buffer));
-
-        const memory = await readMemory(gdb, BASE_BUFFER_SIZE);
-
-        if (snapshot) {
-            const diffs = diffBuffers(snapshot, memory);
-
-            const diffBuffer = new Uint32Array(SIZE_U32 + diffs.length * SIZE_U32);
-
-            diffBuffer[0] = diffs.length;
-
-            diffs.forEach((diff, i) => {
-                diffBuffer[i * DIFF_SIZE + 1] = diff.address;
-                diffBuffer[i * DIFF_SIZE + 2] = diff.value;
-            });
-
-            binFile.write(new Uint8Array(diffBuffer));
-        } else {
-            binFile.write(new Uint8Array(new Uint32Array([0])));
-        }
-
-        snapshot = memory;
-
-        // performance.measure("dump", "dump");
-
-        await gdb.singleStep();
-    }
-
-    binFile.close();
-
-    await writeFile(`metadata-${now}.json`, JSON.stringify(metadata), "utf-8");
-
-    rl.question("Press any key to continue... ", async (answer) => {
+        
         await gdb.disconnect();
+    }
+}
+
+function run(gdb: GDBClient, steps: number) {
+    return new Promise<void>((resolve) => {
+        (async () => {
+            let snapshot: Uint8Array | undefined;
+
+            const metadata: Metadata = {
+                memoryStart: 0,
+                memoryEnd: BASE_BUFFER_SIZE,
+                steps: [],
+            };
+        
+            console.log("Waiting for INT 21 3D")
+            
+            await gdb.monitor("int_bp 0x21 1");
+            await sleep(200);
+            
+            await gdb.continue();
+        
+            while (true) {
+                const trapMessage = await gdb.readResponse();
+        
+                if (trapMessage !== "S05") {
+                    continue;
+                }
+        
+                const registers = await gdb.readRegisters();
+
+                if (((registers[0] >> 8) & 0xff) === 0x3d) {
+                    break;
+                }
+        
+                await gdb.continue();
+            }
+        
+            const now = Date.now();
+
+            const buffer = Buffer.alloc(32 * 1024 * 1024);
+
+            let offset = 0;
+        
+            offset += buffer.write(FOURCC_CODE, offset);
+            offset = buffer.writeUint32LE(VERSION_CODE, offset);
+            offset = buffer.writeUint32LE(BASE_BUFFER_SIZE, offset);
+        
+            const baseMemory = Buffer.from(await readMemory(gdb, BASE_BUFFER_SIZE));
+
+            offset += baseMemory.copy(buffer, offset);
+        
+            for (let step = 0; step < steps; step++) {
+                // performance.mark("dump");
+        
+                console.log(step);
+        
+                // const instruction = ""; // await gdb.monitor("x/i $pc");
+        
+                // const registersOffset = BASE_BUFFER_SIZE + step * (REGISTERS_SIZE + DIFF_SIZE);
+                // const diffOffset = BASE_BUFFER_SIZE + step * (REGISTERS_SIZE + DIFF_SIZE) + REGISTERS_SIZE;
+        
+                // const stepMetadata: Metadata["steps"][number] = {
+                //     instruction,
+                //     registersStart: registersOffset,
+                //     registersEnd: registersOffset + REGISTERS_SIZE,
+                //     diffStart: diffOffset,
+                //     diffEnd: diffOffset + DIFF_SIZE,
+                // };
+        
+                // metadata.steps.push(stepMetadata);
+        
+                const registers = Buffer.from(await gdb.readRegisters());
+        
+                offset += registers.copy(buffer, offset);
+        
+                const memory = await readMemory(gdb, BASE_BUFFER_SIZE);
+        
+                if (snapshot) {
+                    const diffs = diffBuffers(new Uint32Array(snapshot.buffer), new Uint32Array(memory.buffer));
+        
+                    offset = buffer.writeUint32LE(diffs.length, offset);
+        
+                    diffs.forEach((diff, i) => {
+                        offset = buffer.writeUint32LE(diff.address, offset);
+                        offset = buffer.writeUint32LE(diff.value, offset);
+                    });
+                } else {
+                    offset = buffer.writeUint32LE(0, offset);
+                }
+        
+                snapshot = memory;
+        
+                // performance.measure("dump", "dump");
+        
+                await gdb.singleStep();
+            }
+
+            await writeFile(`buffer-${now}.bin`, buffer.slice(0, offset), { encoding: "binary" });
+        
+            // await writeFile(`metadata-${now}.json`, JSON.stringify(metadata), "utf-8");
+        
+            rl.question("Press any key to continue... ", async () => {
+                await cleanup(gdb);
+
+                resolve();
+            });
+        })();
     });
 }
 
 const gdb = new GDBClient(Boolean(process.env.DEBUG));
 
 process.on("SIGINT", async () => {
-    if (gdb.isConnected) {
-        console.log('Disconnecting...');
-        await gdb.disconnect();
-    }
+    await cleanup(gdb);
 
     process.exit();
 });
@@ -202,7 +221,7 @@ async function sleep(timeout: number) {
 }
 
 (async () => {
-    rl.question("Choose how many steps to run [30000]: ", async (answer) => {
+    rl.question(`Choose how many steps to run [${DEFAULT_STEP_COUNT}]: `, async (answer) => {
         console.log("Connecting to GDB...");
         await gdb.connect();
 
@@ -213,7 +232,7 @@ async function sleep(timeout: number) {
         await sleep(200);
 
         console.log("Running...");
-        await run(gdb, answer ? +answer : 30000);
+        await run(gdb, answer ? +answer : DEFAULT_STEP_COUNT);
 
         process.exit();
     });
