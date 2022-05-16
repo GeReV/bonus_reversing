@@ -77,11 +77,14 @@ export function encodeHexUint32(value: number) {
 }
 
 export function decodeHexBuf(encoded: string) {
-    const result = new Uint8Array(encoded.length / 2);
-    for (let i = 0; i < result.length; i++) {
-        result[i] = parseInt(encoded.substring(i * 2, i * 2 + 2), 16);
-    }
-    return result;
+    
+    // const result = new Uint8Array(encoded.length / 2);
+    // for (let i = 0; i < result.length; i++) {
+    //     result[i] = parseInt(encoded.substring(i * 2, i * 2 + 2), 16);
+    // }
+    // return result;
+
+    return Uint8Array.from(Buffer.from(encoded, "hex"));
 }
 
 export function decodeHexUint32Array(encoded: string) {
