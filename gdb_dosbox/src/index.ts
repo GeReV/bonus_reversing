@@ -135,7 +135,7 @@ function run(gdb: GDBClient, steps: number) {
         
             const now = Date.now();
 
-            const buffer = Buffer.alloc(32 * 1024 * 1024);
+            const buffer = Buffer.alloc(128 * 1024 * 1024);
 
             let offset = 0;
         
@@ -146,11 +146,11 @@ function run(gdb: GDBClient, steps: number) {
             const baseMemory = Buffer.from(await readMemory(gdb, BASE_BUFFER_SIZE));
 
             offset += baseMemory.copy(buffer, offset);
-        
+
             for (let step = 0; step < steps; step++) {
                 // performance.mark("dump");
         
-                console.log(step);
+                console.log(`${step}: ${offset} written`);
         
                 // const instruction = ""; // await gdb.monitor("x/i $pc");
         
