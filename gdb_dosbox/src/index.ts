@@ -21,10 +21,10 @@ interface Metadata {
     memoryStart: number;
     memoryEnd: number;
     steps: Array<{
-        instruction: string;
+        // instruction: string;
         registersStart: number;
-        registersEnd: number;
         diffStart: number;
+        diffCount: number;
         diffEnd: number;
     }>;
 }
@@ -58,8 +58,6 @@ const SIZE_U32 = 4;
 const BASE_BUFFER_SIZE = process.env.BASE_BUFFER_SIZE ? Number(process.env.BASE_BUFFER_SIZE) : 0x100000;
 const REGISTERS_SIZE = REGISTERS_386.length * SIZE_U32;
 const DIFF_SIZE = 2 * SIZE_U32;
-
-const EMPTY_DIFF = [0xffffffff, 0x00000000];
 
 const PACKET_LENGTH = 2048 - 5;
 
@@ -106,7 +104,7 @@ function run(gdb: GDBClient, steps: number) {
 
             const metadata: Metadata = {
                 memoryStart: 0,
-                memoryEnd: BASE_BUFFER_SIZE,
+                memoryEnd: 0,
                 steps: [],
             };
         
@@ -142,10 +140,14 @@ function run(gdb: GDBClient, steps: number) {
             offset += buffer.write(FOURCC_CODE, offset);
             offset = buffer.writeUint32LE(VERSION_CODE, offset);
             offset = buffer.writeUint32LE(BASE_BUFFER_SIZE, offset);
-        
+
+            metadata.memoryStart = offset;
+
             const baseMemory = Buffer.from(await readMemory(gdb, BASE_BUFFER_SIZE));
 
             offset += baseMemory.copy(buffer, offset);
+
+            metadata.memoryEnd = offset;
 
             for (let step = 0; step < steps; step++) {
                 // performance.mark("dump");
@@ -153,31 +155,32 @@ function run(gdb: GDBClient, steps: number) {
                 console.log(`${step}: ${offset} written`);
         
                 // const instruction = ""; // await gdb.monitor("x/i $pc");
-        
-                // const registersOffset = BASE_BUFFER_SIZE + step * (REGISTERS_SIZE + DIFF_SIZE);
-                // const diffOffset = BASE_BUFFER_SIZE + step * (REGISTERS_SIZE + DIFF_SIZE) + REGISTERS_SIZE;
-        
-                // const stepMetadata: Metadata["steps"][number] = {
-                //     instruction,
-                //     registersStart: registersOffset,
-                //     registersEnd: registersOffset + REGISTERS_SIZE,
-                //     diffStart: diffOffset,
-                //     diffEnd: diffOffset + DIFF_SIZE,
-                // };
-        
-                // metadata.steps.push(stepMetadata);
-        
+
+                const stepMetadata: Metadata["steps"][number] = {
+                    // instruction,
+                    registersStart: offset,
+                    diffCount: 0,
+                    diffStart: 0,
+                    diffEnd: 0,
+                };
+
                 const registers = Buffer.from(await gdb.readRegisters());
-        
+
                 offset += registers.copy(buffer, offset);
+
+                stepMetadata.diffStart = offset;
+
+                const diffOffset = BASE_BUFFER_SIZE + step * (REGISTERS_SIZE + DIFF_SIZE) + REGISTERS_SIZE;
         
                 const memory = await readMemory(gdb, BASE_BUFFER_SIZE);
         
                 if (snapshot) {
                     const diffs = diffBuffers(new Uint32Array(snapshot.buffer), new Uint32Array(memory.buffer));
         
+                    stepMetadata.diffCount = diffs.length;
+
                     offset = buffer.writeUint32LE(diffs.length, offset);
-        
+
                     diffs.forEach((diff, i) => {
                         offset = buffer.writeUint32LE(diff.address, offset);
                         offset = buffer.writeUint32LE(diff.value, offset);
@@ -185,8 +188,12 @@ function run(gdb: GDBClient, steps: number) {
                 } else {
                     offset = buffer.writeUint32LE(0, offset);
                 }
+
+                stepMetadata.diffEnd = offset;
         
                 snapshot = memory;
+
+                metadata.steps.push(stepMetadata);
         
                 // performance.measure("dump", "dump");
         
@@ -195,7 +202,7 @@ function run(gdb: GDBClient, steps: number) {
 
             await writeFile(`buffer-${now}.bin`, buffer.slice(0, offset), { encoding: "binary" });
         
-            // await writeFile(`metadata-${now}.json`, JSON.stringify(metadata), "utf-8");
+            await writeFile(`metadata-${now}.json`, JSON.stringify(metadata), "utf-8");
         
             rl.question("Press any key to continue... ", async () => {
                 await cleanup(gdb);
