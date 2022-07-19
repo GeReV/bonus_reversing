@@ -133,7 +133,7 @@ function run(gdb: GDBClient, steps: number) {
         
             const now = Date.now();
 
-            const buffer = Buffer.alloc(128 * 1024 * 1024);
+            const buffer = Buffer.alloc(256 * 1024 * 1024);
 
             let offset = 0;
         
@@ -164,14 +164,14 @@ function run(gdb: GDBClient, steps: number) {
                     diffEnd: 0,
                 };
 
-                const registers = Buffer.from(await gdb.readRegisters());
+                const registers = await gdb.readRegisters();
 
-                offset += registers.copy(buffer, offset);
+                registers.forEach(r => {
+                    offset = buffer.writeUint32LE(r, offset);
+                });
 
                 stepMetadata.diffStart = offset;
 
-                const diffOffset = BASE_BUFFER_SIZE + step * (REGISTERS_SIZE + DIFF_SIZE) + REGISTERS_SIZE;
-        
                 const memory = await readMemory(gdb, BASE_BUFFER_SIZE);
         
                 if (snapshot) {

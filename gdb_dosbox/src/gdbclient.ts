@@ -200,7 +200,7 @@ export class GDBClient {
   async readRegisters() {
     const response = await this.sendCommand('g');
 
-    return decodeHexUint32Array(response.slice(0, REGISTERS_386.length * 4));
+    return decodeHexUint32Array(response.slice(0, REGISTERS_386.length * 8));
   }
 
   async readRegister(index: number) {
