@@ -1,10 +1,10 @@
-import fs from 'fs';
-import express from 'express';
+import * as fs from 'fs';
+import * as express from 'express';
 import router from './lib/router';
-import path from 'path';
-import compression from 'compression';
+import * as path from 'path';
+import * as compression from 'compression';
 import { createServer as createViteServer, ViteDevServer } from 'vite';
-import assert from 'assert';
+import { strict as assert } from 'assert';
 
 const isTest = process.env.NODE_ENV === 'test' || !!process.env.VITE_TEST_BUILD;
 
