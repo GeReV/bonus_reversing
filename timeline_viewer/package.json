@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "yarn run server:dev",
-    "server:dev": "ts-node-dev --project tsconfig.server.json src/server",
+    "server:dev": "ts-node-dev --project tsconfig.server.json src/server.ts",
     "server:build": "tsc --project tsconfig.server.json",
     "client:build": "vite build",
     "storybook:build": "build-storybook -o dist/storybook",

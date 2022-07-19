@@ -1,8 +1,8 @@
-import * as fs from 'fs';
-import * as express from 'express';
+import fs from 'fs';
+import express from 'express';
 import router from './lib/router';
-import * as path from 'path';
-import * as compression from 'compression';
+import path from 'path';
+import compression from 'compression';
 import { createServer as createViteServer, ViteDevServer } from 'vite';
 import { strict as assert } from 'assert';
 
