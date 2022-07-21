@@ -115,7 +115,7 @@ export class GDBClient {
 
           if (hashIndex >= 0 && hashIndex + 2 < data.length) {
             if (this.debug) {
-              console.log("Remote console:", String.fromCharCode(...decodeHexBuf(data.slice(0, -3))));
+              console.log("Remote console:", String.fromCharCode(...Array.from(decodeHexBuf(data.slice(0, -3)))));
             }
 
             this.socketWrite('+');
