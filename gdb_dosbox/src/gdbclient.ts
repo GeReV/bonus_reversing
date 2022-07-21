@@ -54,7 +54,7 @@ export class GDBClient {
       };
 
       const handleClose = () => {
-        console.log("Socker closed");
+        console.log("Socket closed");
         this.rejectCurrentResponse?.(new Error(`Socket was closed`));
 
         cleanup();
